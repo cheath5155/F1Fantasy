@@ -339,8 +339,17 @@ def process_race(round_num: int, force: bool = False) -> dict:
 
         for _, row in race_results.iterrows():
             surname    = row["LastName"]
-            finish_pos = int(row["Position"])     if pd.notna(row["Position"])     else None
-            grid_pos   = int(row["GridPosition"]) if pd.notna(row["GridPosition"]) else None
+
+            # Safely convert — guard against NA, inf, and non-finite floats
+            try:
+                finish_pos = int(row["Position"]) if pd.notna(row["Position"]) and pd.isfinite(float(row["Position"])) else None
+            except (ValueError, TypeError):
+                finish_pos = None
+
+            try:
+                grid_pos = int(row["GridPosition"]) if pd.notna(row["GridPosition"]) and pd.isfinite(float(row["GridPosition"])) else None
+            except (ValueError, TypeError):
+                grid_pos = None
 
             db_driver = session.query(Driver).filter_by(surname=surname).first()
             if db_driver is None:
@@ -348,8 +357,12 @@ def process_race(round_num: int, force: bool = False) -> dict:
                 continue
 
             # Qualifying points
-            q_pos  = quali_map.get(surname)
-            q_pts  = quali_position_points(q_pos) if q_pos else 0
+            q_pos = quali_map.get(surname)
+            try:
+                q_pos = int(q_pos) if q_pos is not None and pd.isfinite(float(q_pos)) else None
+            except (ValueError, TypeError):
+                q_pos = None
+            q_pts = quali_position_points(q_pos) if q_pos else 0
 
             # Race finish points
             rf_pts = race_finish_points(finish_pos) if finish_pos else 0
