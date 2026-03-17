@@ -17,7 +17,7 @@ import os
 import json
 import logging
 from datetime import datetime, timezone
-
+import math
 import fastf1
 import pandas as pd
 from flask import Flask, jsonify, request
@@ -302,7 +302,7 @@ def process_race(round_num: int, force: bool = False) -> dict:
         def safe_int(val):
             try:
                 f = float(val)
-                if pd.isna(f) or not pd.isfinite(f):
+                if pd.isna(f) or not math.isfinite(f):
                     return None
                 return int(f)
             except (TypeError, ValueError):
