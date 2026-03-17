@@ -298,10 +298,23 @@ def process_race(round_num: int, force: bool = False) -> dict:
 
         log.info(f"Loaded: {event_name} ({event_date})")
 
+        # ── Helper: safely convert a value to int ────────────────
+        def safe_int(val):
+            try:
+                f = float(val)
+                if pd.isna(f) or not pd.isfinite(f):
+                    return None
+                return int(f)
+            except (TypeError, ValueError):
+                return None
+
         # ── Qualifying results ────────────────────────────────────
         quali_results = quali_session.results[["DriverNumber", "LastName", "Position"]].copy()
-        quali_results["Position"] = quali_results["Position"].astype(int)
-        quali_map = dict(zip(quali_results["LastName"], quali_results["Position"]))
+        quali_map = {}
+        for _, qrow in quali_results.iterrows():
+            pos = safe_int(qrow["Position"])
+            if pos is not None:
+                quali_map[qrow["LastName"]] = pos
 
         # ── Race results ──────────────────────────────────────────
         race_results = race_session.results[[
@@ -319,7 +332,11 @@ def process_race(round_num: int, force: bool = False) -> dict:
 
         # ── Teammate comparison (race finish) ─────────────────────
         # Map surname -> finish position for beat-teammate logic
-        finish_pos_map = dict(zip(race_results["LastName"], race_results["Position"]))
+        finish_pos_map = {}
+        for _, rrow in race_results.iterrows():
+            pos = safe_int(rrow["Position"])
+            if pos is not None:
+                finish_pos_map[rrow["LastName"]] = pos
 
         # F1 team -> list of driver surnames on that team
         f1_team_drivers: dict[str, list[str]] = {}
@@ -339,17 +356,8 @@ def process_race(round_num: int, force: bool = False) -> dict:
 
         for _, row in race_results.iterrows():
             surname    = row["LastName"]
-
-            # Safely convert — guard against NA, inf, and non-finite floats
-            try:
-                finish_pos = int(row["Position"]) if pd.notna(row["Position"]) and pd.isfinite(float(row["Position"])) else None
-            except (ValueError, TypeError):
-                finish_pos = None
-
-            try:
-                grid_pos = int(row["GridPosition"]) if pd.notna(row["GridPosition"]) and pd.isfinite(float(row["GridPosition"])) else None
-            except (ValueError, TypeError):
-                grid_pos = None
+            finish_pos = safe_int(row["Position"])
+            grid_pos   = safe_int(row["GridPosition"])
 
             db_driver = session.query(Driver).filter_by(surname=surname).first()
             if db_driver is None:
@@ -358,11 +366,7 @@ def process_race(round_num: int, force: bool = False) -> dict:
 
             # Qualifying points
             q_pos = quali_map.get(surname)
-            try:
-                q_pos = int(q_pos) if q_pos is not None and pd.isfinite(float(q_pos)) else None
-            except (ValueError, TypeError):
-                q_pos = None
-            q_pts = quali_position_points(q_pos) if q_pos else 0
+            q_pts = quali_position_points(q_pos) if q_pos is not None else 0
 
             # Race finish points
             rf_pts = race_finish_points(finish_pos) if finish_pos else 0
@@ -790,8 +794,6 @@ def api_update_all():
 # ─────────────────────────────────────────────
 # ENTRY POINT
 # ─────────────────────────────────────────────
-# Always initialise DB on startup (works with both gunicorn and direct python)
-init_db()
 
 if __name__ == "__main__":
     log.info("Initialising database…")
