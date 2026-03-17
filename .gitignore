@@ -3,6 +3,11 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+
+fastf1_cache/
+f1fantasy.db
+*.pyc
+
 # C extensions
 *.so
 
