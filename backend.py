@@ -792,21 +792,11 @@ def api_update_all():
 
 
 # ─────────────────────────────────────────────
-# ENTRY POINT
+# STARTUP — runs whether launched via gunicorn or python directly
 # ─────────────────────────────────────────────
+init_db()
+log.info("Database ready.")
 
 if __name__ == "__main__":
-    log.info("Initialising database…")
-    init_db()
-
     log.info("Starting F1 Fantasy API on http://localhost:5000")
-    log.info("Endpoints:")
-    log.info("  GET  /api/standings")
-    log.info("  GET  /api/drivers")
-    log.info("  GET  /api/lineup/<manager>")
-    log.info("  GET  /api/races")
-    log.info("  GET  /api/race/<round_num>")
-    log.info("  POST /api/update/<round_num>")
-    log.info("  POST /api/update/all")
-
     app.run(debug=True, host="0.0.0.0", port=5000)
