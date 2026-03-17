@@ -777,6 +777,8 @@ def api_update_all():
 # ─────────────────────────────────────────────
 # ENTRY POINT
 # ─────────────────────────────────────────────
+# Always initialise DB on startup (works with both gunicorn and direct python)
+init_db()
 
 if __name__ == "__main__":
     log.info("Initialising database…")
