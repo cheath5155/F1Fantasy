@@ -79,7 +79,6 @@ QUALI_POINTS = {
 # P6-P10 earn 3 pts, P11-P15 earn 1, P16+ earn 0
 
 FASTEST_LAP_BONUS    = 5
-DRIVER_OF_DAY_BONUS  = 5
 BEAT_TEAMMATE_BONUS  = 3
 MAX_POSITION_PENALTY = -5   # floor for positions-lost penalty
 
@@ -165,7 +164,6 @@ class DriverRacePoints(Base):
     race_finish_pts = Column(Integer, default=0)
     pos_change_pts  = Column(Integer, default=0)
     fastest_lap_pts = Column(Integer, default=0)
-    dotd_pts        = Column(Integer, default=0)
     beat_teammate_pts = Column(Integer, default=0)
     total_pts       = Column(Integer, default=0)
     finish_pos      = Column(Integer, nullable=True)
@@ -260,20 +258,6 @@ def get_fastest_lap_driver(session_data) -> str | None:
     return None
 
 
-def get_driver_of_day(round_num: int) -> str | None:
-    """
-    Driver of the Day is voted by fans after the race.
-    FastF1 doesn't provide this — you'll need to set it manually
-    or scrape it from the F1 website after each race.
-    
-    Return the driver's surname string, e.g. "Norris", or None.
-    Edit this function after each race weekend.
-    """
-    dotd_results = {
-        # round_num: "Surname"
-        # Example: 1: "Norris",
-    }
-    return dotd_results.get(round_num)
 
 
 def process_race(round_num: int, force: bool = False) -> dict:
@@ -333,9 +317,6 @@ def process_race(round_num: int, force: bool = False) -> dict:
         except Exception:
             fl_driver = None
 
-        # ── Driver of the Day ─────────────────────────────────────
-        dotd_driver = get_driver_of_day(round_num)
-
         # ── Teammate comparison (race finish) ─────────────────────
         # Map surname -> finish position for beat-teammate logic
         finish_pos_map = dict(zip(race_results["LastName"], race_results["Position"]))
@@ -379,9 +360,6 @@ def process_race(round_num: int, force: bool = False) -> dict:
             # Fastest lap bonus
             fl_pts = FASTEST_LAP_BONUS if surname == fl_driver else 0
 
-            # Driver of the Day bonus
-            dotd_pts = DRIVER_OF_DAY_BONUS if surname == dotd_driver else 0
-
             # Beat teammate bonus
             bt_pts = 0
             teammates = [
@@ -394,7 +372,7 @@ def process_race(round_num: int, force: bool = False) -> dict:
                     bt_pts = BEAT_TEAMMATE_BONUS
                     break
 
-            total = q_pts + rf_pts + pc_pts + fl_pts + dotd_pts + bt_pts
+            total = q_pts + rf_pts + pc_pts + fl_pts + bt_pts
 
             # Upsert DriverRacePoints row
             drp = session.query(DriverRacePoints).filter_by(
@@ -412,7 +390,6 @@ def process_race(round_num: int, force: bool = False) -> dict:
                 race_finish_pts=rf_pts,
                 pos_change_pts=pc_pts,
                 fastest_lap_pts=fl_pts,
-                dotd_pts=dotd_pts,
                 beat_teammate_pts=bt_pts,
                 total_pts=total,
                 finish_pos=finish_pos,
@@ -421,12 +398,12 @@ def process_race(round_num: int, force: bool = False) -> dict:
 
             summary[surname] = {
                 "quali": q_pts, "race": rf_pts, "pos_change": pc_pts,
-                "fastest_lap": fl_pts, "dotd": dotd_pts,
+                "fastest_lap": fl_pts,
                 "beat_teammate": bt_pts, "total": total,
             }
 
             log.info(f"  {surname:<14} Q:{q_pts:3}  R:{rf_pts:3}  PC:{pc_pts:+3}  "
-                     f"FL:{fl_pts}  DOTD:{dotd_pts}  BT:{bt_pts}  → {total} pts")
+                     f"FL:{fl_pts}  BT:{bt_pts}  → {total} pts")
 
         # ── Aggregate manager points for this race ────────────────
         managers = session.query(Manager).all()
@@ -754,7 +731,6 @@ def api_race_detail(round_num: int):
                 "race_finish_pts": drp.race_finish_pts,
                 "pos_change_pts": drp.pos_change_pts,
                 "fastest_lap_pts": drp.fastest_lap_pts,
-                "dotd_pts": drp.dotd_pts,
                 "beat_teammate_pts": drp.beat_teammate_pts,
                 "total_pts": drp.total_pts,
             })
